@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Kostenoverzicht Sanering</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#C00000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kostenoverzicht">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+<style>
+  :root {
+    --red: #C00000; --red-light: #E06666; --red-pale: #FCE4E4; --grey: #F2F2F2;
+    --border: #d9d9d9; --text: #222; --amber: #B8860B; --amber-pale: #FFF3CD; --green: #1E7B34; --blue: #4472C4;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: -apple-system, 'Segoe UI', Calibri, Arial, sans-serif;
+    background: #eef0f2; margin: 0; padding: 16px;
+    padding-top: max(16px, var(--safe-top)); padding-bottom: max(16px, var(--safe-bottom));
+    padding-left: max(16px, var(--safe-left)); padding-right: max(16px, var(--safe-right));
+    color: var(--text); overscroll-behavior-y: contain;
+  }
+  .sheet { max-width: 1150px; margin: 0 auto; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,0.12); border-radius: 10px; overflow: hidden; }
+  header.title-block { background: var(--red); color: #fff; padding: 18px 20px; }
+  header.title-block h1 { margin: 0 0 4px 0; font-size: 19px; letter-spacing: 0.3px; }
+  header.title-block p { margin: 0; font-size: 12.5px; opacity: 0.9; }
+  .version-tag { font-size: 10.5px; opacity: 0.85; margin-top: 4px; }
+  .meta-grid { display: grid; grid-template-columns: 1fr; gap: 12px; padding: 16px 18px; background: var(--grey); font-size: 13px; }
+  .meta-grid label { display: block; font-weight: 600; margin-bottom: 4px; color: #555; }
+  .meta-grid input { width: 100%; padding: 12px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 16px; min-height: 44px; }
+  .meta-grid input::placeholder { color: #999; font-style: italic; }
+  .meta-grid input.field-error { border-color: var(--red); background: #FEF0F0; }
+  .field-error-msg { color: var(--red); font-size: 11.5px; margin-top: 4px; display: none; }
+  .field-error-msg.show { display: block; }
+
+  .section-band { background: var(--red); color: #fff; font-weight: 600; padding: 14px 18px; font-size: 15px; margin-top: 14px; }
+  .section-band.collapsible { cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; min-height: 48px; }
+  .section-band.collapsible:active { background: #a80000; }
+  .section-band .chevron { display: inline-block; transition: transform 0.2s ease; font-size: 13px; }
+  .section-band.expanded .chevron { transform: rotate(90deg); }
+  .section-band .hint { font-size: 10.5px; font-weight: 400; opacity: 0.85; display: block; margin-top: 2px; }
+  .section-body { padding: 12px 14px 6px 14px; }
+  .section-body.collapsed { display: none; }
+
+  .split-columns { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  .split-col-header { background: #4a4a4a; color: #fff; font-weight: 700; padding: 8px 12px; font-size: 13px; text-align: center; border-radius: 6px 6px 0 0; letter-spacing: 0.5px; }
+
+  .line-card { background: #fafafa; border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; position: relative; }
+  .line-card.row-incomplete { background: var(--amber-pale); border-color: var(--amber); }
+  .line-card.row-duplicate { border-color: var(--amber); }
+  .line-card-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .line-card-row:last-child { margin-bottom: 0; }
+  .line-card-field { flex: 1; min-width: 0; }
+  .line-card-field label { display: block; font-size: 10.5px; color: #777; font-weight: 600; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .line-card select, .line-card input[type=text] {
+    width: 100%; padding: 10px 8px; border: 1px solid var(--border); border-radius: 6px;
+    font-size: 16px; min-height: 44px; box-sizing: border-box; background: #fff;
+  }
+  .line-card input.input-error { border-color: var(--red) !important; background: #FEF0F0; }
+  .line-card .line-total-display { font-weight: 700; font-size: 17px; color: var(--red); text-align: right; white-space: nowrap; min-width: 90px; }
+  .remove-line-btn { background: #fff; border: 1px solid var(--border); color: #999; cursor: pointer; font-size: 20px; line-height: 1; width: 40px; height: 40px; border-radius: 8px; flex-shrink: 0; }
+  .remove-line-btn:active { color: var(--red); border-color: var(--red); }
+  .add-line-btn { background: #fff; border: 2px dashed var(--red); color: var(--red); padding: 12px 14px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 700; margin: 6px 0 12px 0; width: 100%; min-height: 44px; }
+  .add-line-btn:active { background: var(--red-pale); }
+
+  .subtotal-card { background: var(--red-pale); border-radius: 0 0 8px 8px; padding: 10px 12px; font-weight: 700; font-size: 14px; display: flex; justify-content: space-between; margin-top: -8px; margin-bottom: 4px; }
+
+  .totals-block { padding: 16px 16px; }
+  .totals-row { display: flex; justify-content: space-between; padding: 12px 16px; background: var(--red-pale); border-radius: 8px; margin-bottom: 8px; font-weight: 700; font-size: 15px; }
+  .grand-total { display: flex; justify-content: space-between; align-items: center; background: var(--red); color: #fff; padding: 18px 20px; border-radius: 10px; font-size: 20px; font-weight: 700; margin-top: 10px; }
+  .grand-total.zero-warning { background: var(--amber); }
+  .detail-list { background: #fafafa; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; font-size: 13px; }
+  .detail-list ul { margin: 0; padding-left: 16px; }
+  .detail-list li { margin-bottom: 5px; display: flex; justify-content: space-between; gap: 8px; }
+  .detail-list li .item-name { color: #333; }
+  .detail-list li .item-amount { font-weight: 700; color: #111; white-space: nowrap; }
+  .detail-empty { color: #999; font-style: italic; }
+  .detail-cat-label { font-weight: 700; color: #C00000; margin-top: 8px; font-size: 12px; text-transform: uppercase; }
+  footer { padding: 16px 18px 20px; font-size: 11.5px; color: #888; line-height: 1.5; }
+
+  .top-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 0 12px; }
+  .action-btn { background: #fff; border: 1px solid var(--red); color: var(--red); padding: 12px 14px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; min-height: 44px; flex: 1 1 47%; text-align: center; }
+  .action-btn:active { background: var(--red-pale); }
+  .action-btn.primary { background: var(--red); color: #fff; flex-basis: 100%; }
+  .action-btn.primary:active { background: #a80000; }
+  .action-btn.success { background: var(--green); color: #fff; border-color: var(--green); }
+  .action-btn.success:active { background: #16602a; }
+  .action-btn.mail { background: var(--blue); color: #fff; border-color: var(--blue); flex-basis: 100%; }
+  .action-btn.mail:active { background: #345a9e; }
+  .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  #fileInput { display: none; }
+
+  .mail-preview {
+    display: none; margin: 0 0 12px; padding: 14px 16px; background: #F5F7FA;
+    border: 1px solid var(--border); border-radius: 8px; font-size: 12.5px; color: #333;
+  }
+  .mail-preview.show { display: block; }
+  .mail-preview label { display: block; font-weight: 700; font-size: 11px; color: #666; text-transform: uppercase; margin-bottom: 4px; }
+  .mail-preview textarea {
+    width: 100%; min-height: 110px; border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px; font-size: 14px; font-family: inherit; resize: vertical; box-sizing: border-box;
+  }
+  .mail-preview .mail-preview-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .mail-preview .mail-preview-actions button {
+    flex: 1; padding: 10px; border-radius: 6px; font-weight: 700; font-size: 13px; cursor: pointer; min-height: 40px;
+  }
+  .mail-preview .btn-send { background: var(--blue); color: #fff; border: none; }
+  .mail-preview .btn-cancel { background: #fff; color: #666; border: 1px solid var(--border); }
+
+  .validation-banner { display: none; margin: 0 0 12px; padding: 14px 16px; background: var(--amber-pale); border: 1px solid var(--amber); border-radius: 8px; font-size: 13px; color: #6b5200; }
+  .validation-banner.show { display: block; }
+  .validation-banner strong { display: block; margin-bottom: 6px; }
+  .validation-banner ul { margin: 4px 0 0 0; padding-left: 18px; }
+
+  .save-status { font-size: 12px; color: #888; padding: 6px 2px 10px; text-align: center; }
+  .save-status.saved { color: var(--green); font-weight: 600; }
+
+  .install-banner { display: none; margin: 0 0 12px; padding: 14px 16px; background: #E8F0FE; border: 1px solid var(--blue); border-radius: 8px; font-size: 13px; color: #1a3a6b; flex-direction: column; gap: 10px; }
+  .install-banner.show { display: flex; }
+  .install-banner button { background: var(--blue); color: #fff; border: none; padding: 12px 14px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; min-height: 44px; }
+  .offline-badge { display: none; margin: 0 0 12px; padding: 10px 16px; background: #444; color: #fff; border-radius: 8px; font-size: 12.5px; text-align: center; }
+  .offline-badge.show { display: block; }
+  #iosInstallHint { display: none; margin: 0 0 12px; padding: 14px 16px; background: #E8F0FE; border: 1px solid var(--blue); border-radius: 8px; font-size: 13px; color: #1a3a6b; }
+
+  @media (min-width: 700px) {
+    body { padding: 24px; }
+    .meta-grid { grid-template-columns: 1fr 1fr; }
+    .split-columns { grid-template-columns: 1fr 1fr; }
+    .top-actions { flex-wrap: nowrap; justify-content: flex-end; }
+    .action-btn { flex: 0 1 auto; }
+    .action-btn.primary, .action-btn.mail { flex-basis: auto; }
+    header.title-block h1 { font-size: 22px; }
+  }
+
+</style>
+</head>
+<body>
+
+<div class="offline-badge" id="offlineBadge">📡 Je werkt offline — wijzigingen blijven lokaal bewaard.</div>
+<div class="install-banner" id="installBanner">
+  <span>📲 Zet deze app op je beginscherm voor snelle toegang, ook offline.</span>
+  <button onclick="triggerInstall()">Installeren</button>
+</div>
+<div id="iosInstallHint">
+  📲 <strong>Op iPhone installeren:</strong> tik op het deel-icoon <span style="font-weight:700;">⎋</span> onderaan Safari, kies daarna <strong>"Zet op beginscherm"</strong>.
+</div>
+
+<div class="top-actions">
+  <button class="action-btn success" onclick="saveConcept()">💾 Opslaan als concept</button>
+  <button class="action-btn" onclick="exportJson()">⬇️ Exporteer JSON</button>
+  <button class="action-btn" onclick="document.getElementById('fileInput').click()">⬆️ Importeer JSON</button>
+  <input type="file" id="fileInput" accept="application/json" onchange="importJson(event)">
+  <button class="action-btn" onclick="handlePrintClick()">🖨️ Afdrukken</button>
+  <button class="action-btn mail" id="mailBtn" onclick="openMailPreview()">📧 Mail PDF (liggend)</button>
+</div>
+<div class="save-status" id="saveStatus"></div>
+
+<div class="mail-preview" id="mailPreview">
+  <label>Onderwerp</label>
+  <input type="text" id="mailSubject" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px; font-size:14px; margin-bottom:10px; box-sizing:border-box;">
+  <label>Berichttekst (automatisch voorgesteld — hier nog aanpasbaar)</label>
+  <textarea id="mailBody"></textarea>
+  <div class="mail-preview-actions">
+    <button class="btn-cancel" onclick="closeMailPreview()">Annuleren</button>
+    <button class="btn-send" onclick="confirmAndShareMail()">📧 Delen naar Mail</button>
+  </div>
+</div>
+
+<div class="validation-banner" id="validationBanner">
+  <strong>⚠️ Controleer het overzicht:</strong>
+  <ul id="validationList"></ul>
+</div>
+
+<div class="sheet">
+  <header class="title-block">
+    <h1>KOSTENOVERZICHT SANERING</h1>
+    <p>Kostprijsberekening Gebouw &amp; Inboedel</p>
+    <div class="version-tag" id="versionTag"></div>
+  </header>
+
+  <div class="meta-grid">
+    <div>
+      <label>Chantier / Werf *</label>
+      <input type="text" id="werf" placeholder="Pre-filled door BOS" autocomplete="off" autocapitalize="words">
+      <div class="field-error-msg" id="err-werf">Dit veld is verplicht.</div>
+    </div>
+    <div>
+      <label>Devis / Dossier nr. *</label>
+      <input type="text" id="dossier" placeholder="Pre-filled door BOS" autocomplete="off">
+      <div class="field-error-msg" id="err-dossier">Dit veld is verplicht.</div>
+    </div>
+    <div><label>Werken uitgevoerd van</label><input type="date" id="datumVan"></div>
+    <div><label>tot</label><input type="date" id="datumTot"></div>
+  </div>
+
+  <div id="categories"></div>
+
+  <div class="totals-block">
+    <div class="totals-row"><span>Totaal Gebouw</span><span id="totaalGebouw">€ 0,00</span></div>
+    <div class="detail-list" id="detailGebouw"></div>
+    <div class="totals-row"><span>Totaal Inboedel</span><span id="totaalInboedel">€ 0,00</span></div>
+    <div class="detail-list" id="detailInboedel"></div>
+    <div class="grand-total" id="grandTotalBox"><span>EINDTOTAAL</span><span id="eindtotaal">€ 0,00</span></div>
+  </div>
+
+  <footer>
+    Prijzen excl. BTW. Werkt ook offline: wijzigingen blijven bewaard op dit toestel tot je exporteert. "Mail PDF" stelt automatisch een onderwerp en berichttekst voor (aanpasbaar) en genereert een liggend A4-document dat je via het deelvenster rechtstreeks naar Mail kan sturen als bijlage.
+  </footer>
+</div>
+
+
+<script>
+const TARIEF_VERSIE = {"versie": "2026.1", "geldig_vanaf": "2026-01-01", "laatst_gewijzigd": "2026-09-22", "opmerking": "Dit blok bevat alle tarieven. Bij wijziging: versienummer ophogen en geldig_vanaf aanpassen."};
+const SANERING_ITEMS = [{"id": "san_manDag", "label": "Man/Dag", "price": 440, "unit": "dag"}, {"id": "san_fixatie", "label": "Fixatie/Dag", "price": 640, "unit": "dag"}, {"id": "san_specMethode", "label": "Speciale methoden (asbest, tapijt, fecaal)", "price": 650, "unit": "dag"}, {"id": "san_transport", "label": "Transport Dag/camionette", "price": 1.25, "unit": "km/dag"}, {"id": "san_brandstof", "label": "Brandstoftoeslag", "price": 0.03, "unit": "km/dag"}, {"id": "san_afvalForfait", "label": "Afval verwerking forfait", "price": 110, "unit": "forfait"}, {"id": "san_projectbeheer", "label": "Projectbeheer", "price": 105, "unit": "dag"}, {"id": "san_admin", "label": "Administratiekost", "price": 50, "unit": "forfait"}, {"id": "san_afvalM3", "label": "Afval /m³", "price": 75, "unit": "m³"}];
+const CONTAINER_ITEMS = [{"id": "cont_8", "label": "8 m³", "price": 560, "unit": "stuk"}, {"id": "cont_10", "label": "10 m³", "price": 600, "unit": "stuk"}, {"id": "cont_12", "label": "12 m³", "price": 780, "unit": "stuk"}, {"id": "cont_15", "label": "15 m³", "price": 915, "unit": "stuk"}, {"id": "cont_20", "label": "20 m³", "price": 1050, "unit": "stuk"}, {"id": "cont_30", "label": "30 m³", "price": 1580, "unit": "stuk"}, {"id": "cont_forfait", "label": "Forfait (vrij bedrag)", "price": 0, "unit": "forfait", "free_price": true}];
+const MATERIEEL_ITEMS = [{"id": "mat_elektro", "label": "Elektrogroep/dag", "price": 90, "unit": "dag"}, {"id": "mat_steiger", "label": "Steiger", "price": 75, "unit": "stuk"}, {"id": "mat_kamersteiger", "label": "Kamersteiger", "price": 30, "unit": "stuk"}, {"id": "mat_verhuisdoos", "label": "Verhuisdoos/stuk", "price": 4.5, "unit": "stuk"}, {"id": "mat_lift", "label": "Lift", "price": 0, "unit": "vrij", "free_price": true}];
+const BETALING_GEBOUW_ITEMS = [{"id": "bet_g_dak", "label": "Dakdichting", "price": 0, "unit": "vrij", "free_price": true}, {"id": "bet_g_aq", "label": "AQ International", "price": 0, "unit": "vrij", "free_price": true}, {"id": "bet_g_huur", "label": "Huur toestel", "price": 0, "unit": "vrij", "free_price": true}, {"id": "bet_g_vrij", "label": "Vrije lijn", "price": 0, "unit": "vrij", "free_price": true, "free_label": true}];
+const BETALING_INBOEDEL_ITEMS = [{"id": "bet_i_textiel", "label": "Textiel", "price": 0, "unit": "vrij", "free_price": true}, {"id": "bet_i_tapijt", "label": "Tapijten", "price": 0, "unit": "vrij", "free_price": true}, {"id": "bet_i_vrij", "label": "Vrije lijn", "price": 0, "unit": "vrij", "free_price": true, "free_label": true}];
+const AFTER_BETALING_DATA = {"Ontgeuring": [{"id": "ont_petit", "label": "Petit / Klein (vapor)", "price": 30, "unit": "dag"}, {"id": "ont_grand", "label": "Grand / Groot (vapor)", "price": 55, "unit": "dag"}, {"id": "ont_ozon", "label": "Ozonisation/Ozon (machine à ozone)", "price": 70, "unit": "dag"}], "Droging": [{"id": "dro_condens", "label": "Condensdroger + Vent", "price": 23, "unit": "dag"}, {"id": "dro_condensextra", "label": "Extra condensdroger", "price": 18, "unit": "dag"}, {"id": "dro_adsorptie", "label": "Adsorptiedroger", "price": 33, "unit": "dag"}, {"id": "dro_adsorptieextra", "label": "Extra adsorptiedroger", "price": 25, "unit": "dag"}, {"id": "dro_4weken", "label": "Vanaf 4 weken (toeslag 15%)", "price": 0.15, "unit": "%", "is_percent": true}, {"id": "dro_drysmart", "label": "DRYsmart", "price": 75, "unit": "dag"}, {"id": "dro_deshum", "label": "Deshumidificateur/Ventilateur (per week)", "price": 0, "unit": "vrij", "free_price": true}], "Levering en Ophaling": [{"id": "lev_50min", "label": "< 50 km", "price": 110, "unit": "forfait"}, {"id": "lev_50plus", "label": "> 50 km", "price": 200, "unit": "forfait"}, {"id": "lev_onderaan_klein", "label": "Onderaannemer < €500 (forfait)", "price": 100, "unit": "forfait"}, {"id": "lev_onderaan_groot", "label": "Onderaannemer > €500 (commissie 15%)", "price": 0.15, "unit": "%", "is_percent": true}, {"id": "lev_facturachat", "label": "Montant facture d'achat (sous-traitant)", "price": 0, "unit": "vrij", "free_price": true}, {"id": "lev_facturfact", "label": "Montant à facturer (sous-traitant)", "price": 0, "unit": "vrij", "free_price": true}], "Toeslagen en Premies": [{"id": "toe_weekend", "label": "Weekavond & Zaterdag (50%)", "price": 0.5, "unit": "%", "is_percent": true}, {"id": "toe_zondag", "label": "Zondag & Feestdagen (100%)", "price": 1.0, "unit": "%", "is_percent": true}, {"id": "toe_shift", "label": "Shiftpremie", "price": 9, "unit": "dag"}, {"id": "toe_mask", "label": "Maskpremie", "price": 6, "unit": "dag"}], "Damage Scan": [{"id": "dam_halve", "label": "Halve dag 360°", "price": 355, "unit": "dag"}, {"id": "dam_volledige", "label": "Volledige dag 360°", "price": 700, "unit": "dag"}, {"id": "dam_transport", "label": "Transport", "price": 1.25, "unit": "km/dag"}, {"id": "dam_dearch", "label": "De-archivering + 6 mnd extra", "price": 50, "unit": "forfait"}]};
+const STANDARD_LINES_GEBOUW = ["Man/Dag", "Fixatie/Dag", "Speciale methoden (asbest, tapijt, fecaal)", "Transport Dag/camionette", "Brandstoftoeslag", "Afval verwerking forfait", "Projectbeheer", "Administratiekost"];
+const STANDARD_LINES_INBOEDEL = ["Man/Dag", "Speciale methoden (asbest, tapijt, fecaal)", "Transport Dag/camionette", "Brandstoftoeslag", "Afval verwerking forfait", "Projectbeheer", "Administratiekost"];
+const COLLAPSIBLE_CATEGORIES = ["Betaling aan derden", "Ontgeuring", "Droging", "Levering en Ophaling", "Toeslagen en Premies", "Damage Scan"];
+const NO_QUANTITY_CATEGORIES = ["Betaling aan derden"];
+
+const CATEGORIES = [
+  { name: "Sanering", itemsGebouw: SANERING_ITEMS, itemsInboedel: SANERING_ITEMS, preselectGebouw: STANDARD_LINES_GEBOUW, preselectInboedel: STANDARD_LINES_INBOEDEL },
+  { name: "Container", itemsGebouw: CONTAINER_ITEMS, itemsInboedel: CONTAINER_ITEMS, preselectGebouw: [], preselectInboedel: [] },
+  { name: "Materieel", itemsGebouw: MATERIEEL_ITEMS, itemsInboedel: MATERIEEL_ITEMS, preselectGebouw: [], preselectInboedel: [] },
+  { name: "Betaling aan derden", itemsGebouw: BETALING_GEBOUW_ITEMS, itemsInboedel: BETALING_INBOEDEL_ITEMS, preselectGebouw: [], preselectInboedel: [] }
+];
+Object.keys(AFTER_BETALING_DATA).forEach(name => {
+  CATEGORIES.push({ name: name, itemsGebouw: AFTER_BETALING_DATA[name], itemsInboedel: AFTER_BETALING_DATA[name], preselectGebouw: [], preselectInboedel: [] });
+});
+
+const rowRegistry = new Map();
+let rowCounter = 0;
+const STORAGE_KEY = 'kostenoverzicht_concept_v1';
+
+function fmt(n) { return '€ ' + n.toLocaleString('nl-BE', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function parseNum(str) {
+  if (str === null || str === undefined) return 0;
+  let s = String(str).trim();
+  if (!s) return 0;
+  const hasComma = s.indexOf(',') !== -1;
+  const hasDot = s.indexOf('.') !== -1;
+  if (hasComma && hasDot) { s = s.split('.').join('').replace(',', '.'); }
+  else if (hasComma) { s = s.replace(',', '.'); }
+  s = s.replace(/[^\d.\-]/g, '');
+  const val = parseFloat(s);
+  return isNaN(val) ? 0 : val;
+}
+function safeId(name) { return name.replace(/[^a-zA-Z0-9]/g,''); }
+function buildOptionsHtml(items, preselectLabel) {
+  let html = '<option value="">-- Kies optie --</option>';
+  items.forEach((it, idx) => {
+    const sel = (preselectLabel && it.label === preselectLabel) ? ' selected' : '';
+    html += `<option value="${idx}"${sel}>${it.label}</option>`;
+  });
+  return html;
+}
+function updateRowVisualState(card, entry) {
+  card.classList.toggle('row-incomplete', !!(entry.label && entry.total === 0));
+}
+function checkDuplicatesInContainer(container) {
+  const counts = {};
+  container.querySelectorAll('.line-card').forEach(card => {
+    const entry = rowRegistry.get(card.dataset.rowId);
+    if (entry && entry.label) counts[entry.label] = (counts[entry.label] || 0) + 1;
+  });
+  container.querySelectorAll('.line-card').forEach(card => {
+    const entry = rowRegistry.get(card.dataset.rowId);
+    const select = card.querySelector('select');
+    if (entry && entry.label && counts[entry.label] > 1) {
+      card.classList.add('row-duplicate');
+      if (select) select.title = `Let op: "${entry.label}" komt meermaals voor.`;
+    } else {
+      card.classList.remove('row-duplicate');
+      if (select) select.title = '';
+    }
+  });
+}
+
+function addLine(items, container, catName, side, preselectLabel) {
+  rowCounter++;
+  const rowId = 'row-' + rowCounter;
+  const card = document.createElement('div');
+  card.className = 'line-card';
+  card.dataset.rowId = rowId;
+  rowRegistry.set(rowId, { catName, side, label: '', total: 0, qty: 0, itemId: '' });
+
+  const row1 = document.createElement('div');
+  row1.className = 'line-card-row';
+  const selectField = document.createElement('div');
+  selectField.className = 'line-card-field';
+  selectField.innerHTML = '<label>Omschrijving</label>';
+  const select = document.createElement('select');
+  select.innerHTML = buildOptionsHtml(items, preselectLabel);
+  selectField.appendChild(select);
+  row1.appendChild(selectField);
+
+  const rmBtn = document.createElement('button');
+  rmBtn.className = 'remove-line-btn';
+  rmBtn.innerHTML = '&times;';
+  rmBtn.style.marginTop = '18px';
+  rmBtn.onclick = () => { card.remove(); rowRegistry.delete(rowId); recalcAll(); };
+  row1.appendChild(rmBtn);
+  card.appendChild(row1);
+
+  const row2 = document.createElement('div');
+  row2.className = 'line-card-row';
+  const priceField = document.createElement('div');
+  priceField.className = 'line-card-field';
+  priceField.innerHTML = '<label>Prijs</label>';
+  const priceInput = document.createElement('input');
+  priceInput.type = 'text'; priceInput.readOnly = true; priceInput.value = ''; priceInput.inputMode = 'decimal';
+  priceField.appendChild(priceInput);
+  row2.appendChild(priceField);
+
+  const qtyField = document.createElement('div');
+  qtyField.className = 'line-card-field';
+  qtyField.innerHTML = '<label>Aantal</label>';
+  const qtyInput = document.createElement('input');
+  qtyInput.type = 'text'; qtyInput.inputMode = 'decimal'; qtyInput.placeholder = '0'; qtyInput.value = '';
+  qtyField.appendChild(qtyInput);
+  row2.appendChild(qtyField);
+
+  const totalDisplay = document.createElement('div');
+  totalDisplay.className = 'line-total-display';
+  totalDisplay.textContent = fmt(0);
+  row2.appendChild(totalDisplay);
+  card.appendChild(row2);
+
+  let freePriceValue = 0;
+  select.onchange = () => {
+    freePriceValue = 0;
+    onSelectChange(items, select, priceInput, qtyInput, totalDisplay, rowId, () => freePriceValue, v => { freePriceValue = v; });
+  };
+  qtyInput.oninput = () => {
+    const v = parseNum(qtyInput.value);
+    qtyInput.classList.toggle('input-error', v < 0);
+    recalcLine(items, select, priceInput, qtyInput, totalDisplay, rowId, freePriceValue);
+  };
+  priceInput.oninput = () => {
+    freePriceValue = parseNum(priceInput.value);
+    priceInput.classList.toggle('input-error', freePriceValue < 0);
+    recalcLine(items, select, priceInput, qtyInput, totalDisplay, rowId, freePriceValue);
+  };
+
+  container.appendChild(card);
+  if (preselectLabel) select.onchange();
+  return card;
+}
+
+function onSelectChange(items, select, priceInput, qtyInput, totalCell, rowId, getFreePrice, setFreePrice) {
+  const idx = select.value;
+  if (idx === '') { priceInput.value = ''; priceInput.readOnly = true; setFreePrice(0); }
+  else {
+    const item = items[idx];
+    if (item.free_price) { priceInput.readOnly = false; priceInput.value = ''; priceInput.placeholder = 'bv. 12,50'; setFreePrice(0); }
+    else if (item.is_percent) { priceInput.readOnly = true; priceInput.value = (item.price*100).toFixed(0) + '%'; }
+    else { priceInput.readOnly = true; priceInput.value = fmt(item.price); }
+  }
+  recalcLine(items, select, priceInput, qtyInput, totalCell, rowId, getFreePrice());
+}
+
+function recalcLine(items, select, priceInput, qtyInput, totalCell, rowId, freePriceValue) {
+  const idx = select.value;
+  const qty = parseNum(qtyInput.value);
+  let total = 0, label = '', itemId = '';
+  if (idx !== '') {
+    const item = items[idx];
+    label = item.label; itemId = item.id || item.label;
+    const price = item.free_price ? (freePriceValue || 0) : item.price;
+    total = price * qty;
+  }
+  totalCell.textContent = fmt(total);
+  const entry = rowRegistry.get(rowId);
+  if (entry) { entry.label = label; entry.total = total; entry.qty = qty; entry.itemId = itemId; }
+  const card = select.closest('.line-card');
+  if (card && entry) updateRowVisualState(card, entry);
+  recalcAll();
+}
+
+function addLineNoQty(items, container, catName, side, preselectLabel) {
+  rowCounter++;
+  const rowId = 'row-' + rowCounter;
+  const card = document.createElement('div');
+  card.className = 'line-card';
+  card.dataset.rowId = rowId;
+  rowRegistry.set(rowId, { catName, side, label: '', total: 0, qty: 0, itemId: '' });
+
+  const row1 = document.createElement('div');
+  row1.className = 'line-card-row';
+  const selectField = document.createElement('div');
+  selectField.className = 'line-card-field';
+  selectField.innerHTML = '<label>Omschrijving</label>';
+  const select = document.createElement('select');
+  select.innerHTML = buildOptionsHtml(items, preselectLabel);
+  selectField.appendChild(select);
+  row1.appendChild(selectField);
+
+  const rmBtn = document.createElement('button');
+  rmBtn.className = 'remove-line-btn';
+  rmBtn.innerHTML = '&times;';
+  rmBtn.style.marginTop = '18px';
+  rmBtn.onclick = () => { card.remove(); rowRegistry.delete(rowId); recalcAll(); };
+  row1.appendChild(rmBtn);
+  card.appendChild(row1);
+
+  const customLabelRow = document.createElement('div');
+  customLabelRow.className = 'line-card-row';
+  customLabelRow.style.display = 'none';
+  const customLabelField = document.createElement('div');
+  customLabelField.className = 'line-card-field';
+  customLabelField.innerHTML = '<label>Eigen omschrijving</label>';
+  const customLabelInput = document.createElement('input');
+  customLabelInput.type = 'text'; customLabelInput.placeholder = 'Omschrijving...';
+  customLabelField.appendChild(customLabelInput);
+  customLabelRow.appendChild(customLabelField);
+  card.appendChild(customLabelRow);
+
+  const row2 = document.createElement('div');
+  row2.className = 'line-card-row';
+  const priceField = document.createElement('div');
+  priceField.className = 'line-card-field';
+  priceField.innerHTML = '<label>Prijs</label>';
+  const priceInput = document.createElement('input');
+  priceInput.type = 'text'; priceInput.readOnly = true; priceInput.value = ''; priceInput.inputMode = 'decimal';
+  priceField.appendChild(priceInput);
+  row2.appendChild(priceField);
+
+  const totalDisplay = document.createElement('div');
+  totalDisplay.className = 'line-total-display';
+  totalDisplay.textContent = fmt(0);
+  row2.appendChild(totalDisplay);
+  card.appendChild(row2);
+
+  let freePriceValue = 0, customLabelValue = '';
+  function recalc() {
+    const idx = select.value;
+    let total = 0, label = '', itemId = '';
+    if (idx !== '') {
+      const item = items[idx];
+      label = (item.free_label && customLabelValue) ? customLabelValue : item.label;
+      itemId = item.id || item.label;
+      const price = item.free_price ? (freePriceValue || 0) : item.price;
+      total = price * 1;
+    }
+    totalDisplay.textContent = fmt(total);
+    const entry = rowRegistry.get(rowId);
+    if (entry) { entry.label = label; entry.total = total; entry.qty = 0; entry.itemId = itemId; updateRowVisualState(card, entry); }
+    recalcAll();
+  }
+  select.onchange = () => {
+    freePriceValue = 0;
+    const idx = select.value;
+    if (idx !== '' && items[idx].free_label) {
+      customLabelRow.style.display = 'flex'; customLabelInput.value = items[idx].label; customLabelValue = items[idx].label;
+    } else {
+      customLabelRow.style.display = 'none'; customLabelInput.value = ''; customLabelValue = '';
+    }
+    if (idx === '') { priceInput.value = ''; priceInput.readOnly = true; priceInput.placeholder = ''; }
+    else {
+      const item = items[idx];
+      if (item.free_price) { priceInput.readOnly = false; priceInput.value = ''; priceInput.placeholder = 'bv. 12,50'; }
+      else { priceInput.readOnly = true; priceInput.value = fmt(item.price); }
+    }
+    recalc();
+  };
+  priceInput.oninput = () => { freePriceValue = parseNum(priceInput.value); priceInput.classList.toggle('input-error', freePriceValue < 0); recalc(); };
+  customLabelInput.oninput = () => { customLabelValue = customLabelInput.value; recalc(); };
+
+  container.appendChild(card);
+  if (preselectLabel) select.onchange();
+  return card;
+}
+
+function toggleSection(band, body) {
+  const isCollapsed = body.classList.contains('collapsed');
+  if (isCollapsed) { body.classList.remove('collapsed'); band.classList.add('expanded'); }
+  else { body.classList.add('collapsed'); band.classList.remove('expanded'); }
+}
+
+function buildSplitCategory(cat) {
+  const categoriesEl = document.getElementById('categories');
+  const isCollapsible = COLLAPSIBLE_CATEGORIES.includes(cat.name);
+  const isNoQty = NO_QUANTITY_CATEGORIES.includes(cat.name);
+
+  const band = document.createElement('div');
+  band.className = 'section-band';
+  band.dataset.catname = cat.name;
+  const body = document.createElement('div');
+  body.className = 'section-body';
+
+  if (isCollapsible) {
+    band.classList.add('collapsible');
+    body.classList.add('collapsed');
+    const titleSpan = document.createElement('span');
+    titleSpan.innerHTML = `<span class="chevron">&#9656;</span> ${cat.name}<span class="hint">(indien van toepassing &mdash; tik om te openen)</span>`;
+    band.appendChild(titleSpan);
+    band.onclick = () => toggleSection(band, body);
+  } else {
+    band.textContent = cat.name;
+  }
+  categoriesEl.appendChild(band);
+  categoriesEl.appendChild(body);
+
+  const cols = document.createElement('div');
+  cols.className = 'split-columns';
+  body.appendChild(cols);
+
+  const sides = [
+    { key: 'Gebouw', label: 'GEBOUW', preselect: cat.preselectGebouw, items: cat.itemsGebouw },
+    { key: 'Inboedel', label: 'INBOEDEL', preselect: cat.preselectInboedel, items: cat.itemsInboedel }
+  ];
+
+  sides.forEach(side => {
+    const catKey = safeId(cat.name) + '_' + side.key;
+    const wrap = document.createElement('div');
+    const header = document.createElement('div');
+    header.className = 'split-col-header';
+    header.textContent = side.label;
+    wrap.appendChild(header);
+
+    const cardsContainer = document.createElement('div');
+    cardsContainer.dataset.cat = catKey; cardsContainer.dataset.side = side.key; cardsContainer.dataset.catname = cat.name;
+    cardsContainer.id = 'cards-' + catKey;
+    cardsContainer.style.paddingTop = '10px';
+    wrap.appendChild(cardsContainer);
+
+    const addFn = isNoQty ? addLineNoQty : addLine;
+    if (side.preselect && side.preselect.length > 0) {
+      side.preselect.forEach(label => addFn(side.items, cardsContainer, cat.name, side.key, label));
+    } else {
+      addFn(side.items, cardsContainer, cat.name, side.key);
+    }
+
+    const btn = document.createElement('button');
+    btn.className = 'add-line-btn';
+    btn.textContent = '+ Extra lijn toevoegen';
+    btn.onclick = () => addFn(side.items, cardsContainer, cat.name, side.key);
+    wrap.appendChild(btn);
+
+    const subtotalCard = document.createElement('div');
+    subtotalCard.className = 'subtotal-card';
+    subtotalCard.innerHTML = `<span>Subtotaal ${side.label}</span><span id="subtotal-${catKey}">${fmt(0)}</span>`;
+    wrap.appendChild(subtotalCard);
+
+    cols.appendChild(wrap);
+  });
+}
+
+function computeContainerSubtotal(container) {
+  let subtotal = 0;
+  container.querySelectorAll('.line-card').forEach(card => {
+    const entry = rowRegistry.get(card.dataset.rowId);
+    if (entry) subtotal += entry.total;
+  });
+  return subtotal;
+}
+
+function buildDetailListInto(container, side) {
+  const grouped = {};
+  rowRegistry.forEach(entry => {
+    if (entry.side !== side || !entry.label || entry.total === 0) return;
+    (grouped[entry.catName] = grouped[entry.catName] || []).push(entry);
+  });
+  container.innerHTML = '';
+  const catNames = Object.keys(grouped);
+  if (catNames.length === 0) { container.innerHTML = '<span class="detail-empty">Nog geen items geselecteerd.</span>'; return; }
+  catNames.forEach(catName => {
+    const catDiv = document.createElement('div');
+    const catLabel = document.createElement('div');
+    catLabel.className = 'detail-cat-label'; catLabel.textContent = catName;
+    catDiv.appendChild(catLabel);
+    const ul = document.createElement('ul');
+    grouped[catName].forEach(entry => {
+      const li = document.createElement('li');
+      const qtyText = entry.qty ? ` (x${entry.qty})` : '';
+      li.innerHTML = `<span class="item-name">${entry.label}${qtyText}</span><span class="item-amount">${fmt(entry.total)}</span>`;
+      ul.appendChild(li);
+    });
+    catDiv.appendChild(ul);
+    container.appendChild(catDiv);
+  });
+}
+function buildDetailList(side) { buildDetailListInto(document.getElementById('detail' + side), side); }
+
+function recalcAll() {
+  let totalGebouw = 0, totalInboedel = 0;
+  document.querySelectorAll('[data-cat]').forEach(container => {
+    const catKey = container.dataset.cat, side = container.dataset.side;
+    checkDuplicatesInContainer(container);
+    const subtotal = computeContainerSubtotal(container);
+    const subEl = document.getElementById('subtotal-' + catKey);
+    if (subEl) subEl.textContent = fmt(subtotal);
+    if (side === 'Gebouw') totalGebouw += subtotal;
+    if (side === 'Inboedel') totalInboedel += subtotal;
+  });
+  document.getElementById('totaalGebouw').textContent = fmt(totalGebouw);
+  document.getElementById('totaalInboedel').textContent = fmt(totalInboedel);
+  document.getElementById('eindtotaal').textContent = fmt(totalGebouw + totalInboedel);
+  document.getElementById('grandTotalBox').classList.toggle('zero-warning', (totalGebouw + totalInboedel) === 0);
+  buildDetailList('Gebouw'); buildDetailList('Inboedel');
+}
+
+function generatePdfBlob() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const red = [192, 0, 0];
+  const redPale = [252, 228, 228];
+  const grey = [74, 74, 74];
+
+  doc.setFillColor(...red);
+  doc.rect(0, 0, pageWidth, 16, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(15);
+  doc.setFont(undefined, 'bold');
+  doc.text('KOSTENOVERZICHT SANERING', 8, 10);
+
+  const werf = document.getElementById('werf').value || '-';
+  const dossier = document.getElementById('dossier').value || '-';
+  doc.setFontSize(8);
+  doc.setFont(undefined, 'normal');
+  doc.text(`Chantier/Werf: ${werf}   |   Dossier: ${dossier}   |   Tariefversie: ${TARIEF_VERSIE.versie}`, 8, 14.5);
+
+  let totalGebouw = 0, totalInboedel = 0;
+  document.querySelectorAll('[data-cat]').forEach(container => {
+    const subtotal = computeContainerSubtotal(container);
+    if (container.dataset.side === 'Gebouw') totalGebouw += subtotal; else totalInboedel += subtotal;
+  });
+
+  function buildRowsForSide(side) {
+    const grouped = {};
+    rowRegistry.forEach(entry => {
+      if (entry.side !== side || !entry.label || entry.total === 0) return;
+      (grouped[entry.catName] = grouped[entry.catName] || []).push(entry);
+    });
+    const rows = [];
+    Object.keys(grouped).forEach(catName => {
+      rows.push([{ content: catName, styles: { fontStyle: 'bold', textColor: red, fillColor: [255,255,255] } }, '']);
+      grouped[catName].forEach(entry => {
+        const qtyText = entry.qty ? ` (x${entry.qty})` : '';
+        rows.push([entry.label + qtyText, fmt(entry.total)]);
+      });
+    });
+    if (rows.length === 0) rows.push(['Geen items geselecteerd.', '']);
+    return rows;
+  }
+
+  const startY = 20;
+  const colWidth = (pageWidth - 24) / 2;
+
+  doc.autoTable({
+    startY: startY, margin: { left: 8, right: pageWidth - 8 - colWidth },
+    head: [[{ content: 'GEBOUW', colSpan: 2, styles: { halign: 'center', fillColor: grey, textColor: 255 } }]],
+    body: [], theme: 'plain', tableWidth: colWidth,
+  });
+  const gebouwStartY = doc.lastAutoTable.finalY;
+  doc.autoTable({
+    startY: gebouwStartY, margin: { left: 8 }, head: [], body: buildRowsForSide('Gebouw'),
+    theme: 'striped', tableWidth: colWidth, styles: { fontSize: 8, cellPadding: 1.5 },
+    columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
+    foot: [[{ content: 'Totaal Gebouw', styles: { fontStyle: 'bold', fillColor: redPale } }, { content: fmt(totalGebouw), styles: { fontStyle: 'bold', fillColor: redPale, halign: 'right' } }]],
+  });
+  const gebouwEndY = doc.lastAutoTable.finalY;
+
+  doc.autoTable({
+    startY: startY, margin: { left: 8 + colWidth + 8 },
+    head: [[{ content: 'INBOEDEL', colSpan: 2, styles: { halign: 'center', fillColor: grey, textColor: 255 } }]],
+    body: [], theme: 'plain', tableWidth: colWidth,
+  });
+  const inboedelStartY = doc.lastAutoTable.finalY;
+  doc.autoTable({
+    startY: inboedelStartY, margin: { left: 8 + colWidth + 8 }, head: [], body: buildRowsForSide('Inboedel'),
+    theme: 'striped', tableWidth: colWidth, styles: { fontSize: 8, cellPadding: 1.5 },
+    columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
+    foot: [[{ content: 'Totaal Inboedel', styles: { fontStyle: 'bold', fillColor: redPale } }, { content: fmt(totalInboedel), styles: { fontStyle: 'bold', fillColor: redPale, halign: 'right' } }]],
+  });
+  const inboedelEndY = doc.lastAutoTable.finalY;
+
+  const bottomY = Math.max(gebouwEndY, inboedelEndY) + 6;
+  doc.setFillColor(...red);
+  doc.rect(8, bottomY, pageWidth - 16, 10, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(13);
+  doc.setFont(undefined, 'bold');
+  doc.text('EINDTOTAAL', 12, bottomY + 6.5);
+  doc.text(fmt(totalGebouw + totalInboedel), pageWidth - 12, bottomY + 6.5, { align: 'right' });
+
+  doc.setTextColor(120, 120, 120);
+  doc.setFontSize(7);
+  doc.setFont(undefined, 'normal');
+  doc.text('Prijzen excl. BTW.', 8, bottomY + 15);
+
+  return doc.output('blob');
+}
+
+// ---------- Automatisch voorstellen van onderwerp + berichttekst ----------
+function formatDateNl(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  if (isNaN(d)) return '';
+  return d.toLocaleDateString('nl-BE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function buildMailSubjectAndBody() {
+  const werf = document.getElementById('werf').value.trim();
+  const dossier = document.getElementById('dossier').value.trim();
+  const datumVan = formatDateNl(document.getElementById('datumVan').value);
+  const datumTot = formatDateNl(document.getElementById('datumTot').value);
+
+  let totalGebouw = 0, totalInboedel = 0;
+  document.querySelectorAll('[data-cat]').forEach(container => {
+    const subtotal = computeContainerSubtotal(container);
+    if (container.dataset.side === 'Gebouw') totalGebouw += subtotal; else totalInboedel += subtotal;
+  });
+  const eindtotaal = totalGebouw + totalInboedel;
+
+  const subjectParts = ['Kostenoverzicht sanering'];
+  if (werf) subjectParts.push('-', werf);
+  if (dossier) subjectParts.push(`(dossier ${dossier})`);
+  const subject = subjectParts.join(' ');
+
+  const lines = [];
+  lines.push('Beste,');
+  lines.push('');
+  lines.push('Hierbij het kostenoverzicht voor onderstaand dossier:');
+  lines.push('');
+  if (werf) lines.push(`Werf: ${werf}`);
+  if (dossier) lines.push(`Dossier nr.: ${dossier}`);
+  if (datumVan || datumTot) lines.push(`Periode werken: ${datumVan || '...'} tot ${datumTot || '...'}`);
+  lines.push('');
+  lines.push(`Totaal Gebouw: ${fmt(totalGebouw)}`);
+  lines.push(`Totaal Inboedel: ${fmt(totalInboedel)}`);
+  lines.push(`Eindtotaal: ${fmt(eindtotaal)} (excl. BTW)`);
+  lines.push('');
+  lines.push('De volledige detaillijst per categorie is terug te vinden in de bijgevoegde PDF.');
+  lines.push('');
+  lines.push('Met vriendelijke groeten,');
+
+  return { subject, body: lines.join('\n') };
+}
+
+function openMailPreview() {
+  const result = validateForm();
+  if (!result.valid) {
+    if (!confirm('Er zijn nog aandachtspunten (zie de gele melding bovenaan). Toch doorgaan?')) return;
+  }
+  const { subject, body } = buildMailSubjectAndBody();
+  document.getElementById('mailSubject').value = subject;
+  document.getElementById('mailBody').value = body;
+  document.getElementById('mailPreview').classList.add('show');
+  document.getElementById('mailPreview').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function closeMailPreview() {
+  document.getElementById('mailPreview').classList.remove('show');
+}
+
+async function confirmAndShareMail() {
+  const subject = document.getElementById('mailSubject').value.trim() || 'Kostenoverzicht sanering';
+  const body = document.getElementById('mailBody').value;
+
+  const mailBtn = document.getElementById('mailBtn');
+  const sendBtn = document.querySelector('.mail-preview .btn-send');
+  sendBtn.disabled = true;
+  sendBtn.textContent = '⏳ PDF wordt gemaakt...';
+
+  try {
+    const blob = generatePdfBlob();
+    const werfPart = (document.getElementById('werf').value || 'kostenoverzicht').replace(/[^a-zA-Z0-9]/g, '_');
+    const filename = `Kostenoverzicht_${werfPart}_${new Date().toISOString().slice(0,10)}.pdf`;
+    const file = new File([blob], filename, { type: 'application/pdf' });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: subject, text: body });
+      closeMailPreview();
+    } else {
+      downloadBlobFallback(blob, filename);
+      const mailtoUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.location.href = mailtoUrl;
+      alert('Delen met PDF-bijlage wordt niet ondersteund door deze browser. De PDF is gedownload en de Mail-app wordt geopend met onderwerp en tekst al ingevuld — voeg de gedownloade PDF handmatig toe als bijlage.');
+      closeMailPreview();
+    }
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      console.error(err);
+      alert('Er ging iets mis: ' + err.message);
+    }
+  } finally {
+    sendBtn.disabled = false;
+    sendBtn.textContent = '📧 Delen naar Mail';
+  }
+}
+
+function downloadBlobFallback(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function validateForm() {
+  const issues = [];
+  const werfEl = document.getElementById('werf'), dossierEl = document.getElementById('dossier');
+  document.getElementById('err-werf').classList.remove('show');
+  document.getElementById('err-dossier').classList.remove('show');
+  werfEl.classList.remove('field-error'); dossierEl.classList.remove('field-error');
+
+  if (!werfEl.value.trim()) { issues.push('Chantier / Werf is niet ingevuld.'); werfEl.classList.add('field-error'); document.getElementById('err-werf').classList.add('show'); }
+  if (!dossierEl.value.trim()) { issues.push('Devis / Dossier nr. is niet ingevuld.'); dossierEl.classList.add('field-error'); document.getElementById('err-dossier').classList.add('show'); }
+
+  let totalGebouw = 0, totalInboedel = 0;
+  document.querySelectorAll('[data-cat]').forEach(container => {
+    const subtotal = computeContainerSubtotal(container);
+    if (container.dataset.side === 'Gebouw') totalGebouw += subtotal; else totalInboedel += subtotal;
+  });
+  if (totalGebouw + totalInboedel === 0) issues.push('Het Eindtotaal staat op € 0,00 — er is nog niets berekend.');
+
+  let incompleteCount = 0;
+  rowRegistry.forEach(entry => { if (entry.label && entry.total === 0) incompleteCount++; });
+  if (incompleteCount > 0) issues.push(`${incompleteCount} lijn(en) hebben een keuze maar geen (volledige) prijs/aantal ingevuld.`);
+
+  const duplicateCats = new Set();
+  document.querySelectorAll('.line-card.row-duplicate').forEach(card => {
+    const entry = rowRegistry.get(card.dataset.rowId);
+    if (entry) duplicateCats.add(entry.catName + ' (' + entry.side + ')');
+  });
+  if (duplicateCats.size > 0) issues.push('Mogelijk dubbel gekozen item in: ' + Array.from(duplicateCats).join(', ') + '.');
+
+  const banner = document.getElementById('validationBanner');
+  document.getElementById('validationList').innerHTML = issues.map(i => `<li>${i}</li>`).join('');
+  banner.classList.toggle('show', issues.length > 0);
+  return { valid: issues.length === 0 };
+}
+
+function handlePrintClick() {
+  const result = validateForm();
+  if (!result.valid) {
+    if (!confirm('Er zijn nog aandachtspunten. Toch doorgaan met afdrukken?')) return;
+  }
+  try {
+    const blob = generatePdfBlob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  } catch (err) {
+    alert('Kon geen PDF-voorbeeld openen: ' + err.message);
+  }
+}
+
+function collectState() {
+  const rows = [];
+  document.querySelectorAll('[data-cat]').forEach(container => {
+    const catName = container.dataset.catname, side = container.dataset.side;
+    container.querySelectorAll('.line-card').forEach(card => {
+      const entry = rowRegistry.get(card.dataset.rowId);
+      if (!entry || !entry.label) return;
+      const priceInput = card.querySelectorAll('input[type=text]')[0];
+      rows.push({ catName, side, itemId: entry.itemId, label: entry.label, priceValue: priceInput ? priceInput.value : '', qty: entry.qty, total: entry.total });
+    });
+  });
+  return {
+    exportType: 'kostenoverzicht_sanering_concept',
+    tariefVersie: TARIEF_VERSIE.versie,
+    tariefGeldigVanaf: TARIEF_VERSIE.geldig_vanaf,
+    opgeslagenOp: new Date().toISOString(),
+    werf: document.getElementById('werf').value,
+    dossier: document.getElementById('dossier').value,
+    datumVan: document.getElementById('datumVan').value,
+    datumTot: document.getElementById('datumTot').value,
+    rows
+  };
+}
+
+function saveConcept() {
+  const state = collectState();
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const statusEl = document.getElementById('saveStatus');
+    statusEl.textContent = '✓ Concept opgeslagen om ' + new Date().toLocaleTimeString('nl-BE') + '.';
+    statusEl.classList.add('saved');
+  } catch (e) { alert('Opslaan is mislukt: ' + e.message); }
+}
+
+function tryAutoLoadConcept() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const state = JSON.parse(raw);
+    if (!state || !state.rows) return;
+    if (confirm('Eerder opgeslagen concept gevonden (' + new Date(state.opgeslagenOp).toLocaleString('nl-BE') + '). Herladen?')) applyState(state);
+  } catch (e) {}
+}
+
+function applyState(state) {
+  document.getElementById('werf').value = state.werf || '';
+  document.getElementById('dossier').value = state.dossier || '';
+  document.getElementById('datumVan').value = state.datumVan || '';
+  document.getElementById('datumTot').value = state.datumTot || '';
+  document.querySelectorAll('[data-cat]').forEach(c => { c.innerHTML = ''; });
+  rowRegistry.clear();
+
+  const grouped = {};
+  (state.rows || []).forEach(r => { const key = safeId(r.catName) + '_' + r.side; (grouped[key] = grouped[key] || []).push(r); });
+
+  CATEGORIES.forEach(cat => {
+    ['Gebouw', 'Inboedel'].forEach(side => {
+      const catKey = safeId(cat.name) + '_' + side;
+      const container = document.getElementById('cards-' + catKey);
+      if (!container) return;
+      const items = side === 'Gebouw' ? cat.itemsGebouw : cat.itemsInboedel;
+      const isNoQty = NO_QUANTITY_CATEGORIES.includes(cat.name);
+      const addFn = isNoQty ? addLineNoQty : addLine;
+      const rowsForThis = grouped[catKey] || [];
+      if (rowsForThis.length === 0) {
+        const preselect = side === 'Gebouw' ? cat.preselectGebouw : cat.preselectInboedel;
+        if (preselect && preselect.length > 0) preselect.forEach(label => addFn(items, container, cat.name, side, label));
+        else addFn(items, container, cat.name, side);
+        return;
+      }
+      rowsForThis.forEach(r => {
+        const card = addFn(items, container, cat.name, side, r.label);
+        if (!isNoQty) {
+          const qtyInput = card.querySelectorAll('input[inputmode=decimal]')[1];
+          if (qtyInput && r.qty) { qtyInput.value = r.qty; qtyInput.dispatchEvent(new Event('input')); }
+        }
+        const priceInput = card.querySelectorAll('input[type=text]')[isNoQty ? 1 : 0];
+        const item = items.find(it => (it.id || it.label) === r.itemId);
+        if (item && item.free_price && priceInput && !priceInput.readOnly && r.priceValue) {
+          priceInput.value = r.priceValue; priceInput.dispatchEvent(new Event('input'));
+        }
+      });
+    });
+  });
+  recalcAll();
+}
+
+function exportJson() {
+  const state = collectState();
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const werfPart = (state.werf || 'kostenoverzicht').replace(/[^a-zA-Z0-9]/g, '_');
+  a.href = url; a.download = `kostenoverzicht_${werfPart}_${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importJson(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const state = JSON.parse(e.target.result);
+      if (state.tariefVersie && state.tariefVersie !== TARIEF_VERSIE.versie) {
+        if (!confirm(`Tariefversie ${state.tariefVersie} vs huidige ${TARIEF_VERSIE.versie}. Toch importeren?`)) { event.target.value = ''; return; }
+      }
+      applyState(state);
+    } catch (err) { alert('Kon dit bestand niet lezen: ' + err.message); }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+let deferredInstallPrompt = null;
+function isIos() { return /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()); }
+function isInStandaloneMode() { return ('standalone' in window.navigator) && (window.navigator.standalone); }
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW registratie mislukt:', err));
+  });
+}
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault(); deferredInstallPrompt = e;
+  document.getElementById('installBanner').classList.add('show');
+});
+function triggerInstall() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.then(() => {
+    document.getElementById('installBanner').classList.remove('show');
+    deferredInstallPrompt = null;
+  });
+}
+window.addEventListener('appinstalled', () => { document.getElementById('installBanner').classList.remove('show'); });
+if (isIos() && !isInStandaloneMode()) { document.getElementById('iosInstallHint').style.display = 'block'; }
+
+function updateOnlineStatus() {
+  document.getElementById('offlineBadge').classList.toggle('show', !navigator.onLine);
+}
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+updateOnlineStatus();
+
+document.getElementById('versionTag').textContent = `Tarieven versie ${TARIEF_VERSIE.versie} — geldig vanaf ${TARIEF_VERSIE.geldig_vanaf}`;
+CATEGORIES.forEach(cat => buildSplitCategory(cat));
+recalcAll();
+window.addEventListener('DOMContentLoaded', tryAutoLoadConcept);
+tryAutoLoadConcept();
+</script>
+</body>
+</html>
